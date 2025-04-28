@@ -9,8 +9,8 @@ from my_robot_slam import MyRobotSlam
 from worlds.my_world import MyWorld
 
 if __name__ == '__main__':
-    lidar_params = LidarParams()
-    lidar_params.noise_enable = True
+    lidar_params = LidarParams() # crée un objet de type LidarParams
+    lidar_params.noise_enable = True 
     # lidar_params.fov = 360
     # lidar_params.resolution = 361
     # lidar_params.max_range = 600
