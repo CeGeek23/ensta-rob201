@@ -10,3 +10,5 @@ dist = [d0, d1, d2, ...., d360]
 
 raysangle = [-pi, ......, pi]
 
+lidar.max_range() : les valeurs maximales
+

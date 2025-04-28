@@ -16,7 +16,10 @@ class OccupancyGrid:
     """Simple occupancy grid"""
 
     def __init__(self, x_min, x_max, y_min, y_max, resolution):
-        # Given : constructor
+        """
+        # constructeur qui initialise la grille d'occupation et 
+        # définit les bornes et la résolution de la carte
+        """
         self.x_min_world = x_min
         self.x_max_world = x_max
         self.y_min_world = y_min
@@ -34,40 +37,7 @@ class OccupancyGrid:
                                           cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'),
                                           7,
                                           (self.x_max_map, self.y_max_map))
-
-    def conv_world_to_map(self, x_world, y_world):
-        """
-        Convert from world coordinates to map coordinates (i.e. cell index in the grid map)
-        x_world, y_world : list of x and y coordinates in m
-        """
-
-        x_map = (x_world - self.x_min_world) / self.resolution
-        y_map = (y_world - self.y_min_world) / self.resolution
-
-        if isinstance(x_map, float):
-            x_map = int(x_map)
-            y_map = int(y_map)
-        elif isinstance(x_map, np.ndarray):
-            x_map = x_map.astype(int)
-            y_map = y_map.astype(int)
-
-        return x_map, y_map
-
-    def conv_map_to_world(self, x_map, y_map):
-        """
-        Convert from map coordinates to world coordinates
-        x_map, y_map : list of x and y coordinates in cell numbers (~pixels)
-        """
-
-        x_world = self.x_min_world + x_map * self.resolution
-        y_world = self.y_min_world + y_map * self.resolution
-
-        if isinstance(x_world, np.ndarray):
-            x_world = x_world.astype(float)
-            y_world = y_world.astype(float)
-
-        return x_world, y_world
-
+                
     def add_value_along_line(self, x_0: float, y_0: float, x_1: float, y_1: float, val):
         """
         Add a value to a line of points using Bresenham algorithm, input in world coordinates
@@ -115,6 +85,39 @@ class OccupancyGrid:
 
         # add value to the points
         self.occupancy_map[points[0], points[1]] += val
+
+    def conv_world_to_map(self, x_world, y_world):
+        """
+        Convert from world coordinates to map coordinates (i.e. cell index in the grid map)
+        x_world, y_world : list of x and y coordinates in m
+        """
+
+        x_map = (x_world - self.x_min_world) / self.resolution
+        y_map = (y_world - self.y_min_world) / self.resolution
+
+        if isinstance(x_map, float):
+            x_map = int(x_map)
+            y_map = int(y_map)
+        elif isinstance(x_map, np.ndarray):
+            x_map = x_map.astype(int)
+            y_map = y_map.astype(int)
+
+        return x_map, y_map
+
+    def conv_map_to_world(self, x_map, y_map):
+        """
+        Convert from map coordinates to world coordinates
+        x_map, y_map : list of x and y coordinates in cell numbers (~pixels)
+        """
+
+        x_world = self.x_min_world + x_map * self.resolution
+        y_world = self.y_min_world + y_map * self.resolution
+
+        if isinstance(x_world, np.ndarray):
+            x_world = x_world.astype(float)
+            y_world = y_world.astype(float)
+
+        return x_world, y_world
 
     def add_map_points(self, points_x, points_y, val):
         """

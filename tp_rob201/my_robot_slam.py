@@ -64,16 +64,6 @@ class MyRobotSlam(RobotAbstract):
         # default command
         command = {"forward": 0, "rotation": 0}
 
-
-        # save robot origin
-        if self.counter == 0:
-            self.corrected_pose = self.odometer_values()
-
-            if self.explore is False:
-                # self.tiny_slam.read_map('./tp_rob201/maps/occupancy_map_2023-05-03_09-45-43.csv')
-                self.tiny_slam.read_map('./tp_rob201/maps/occupancy_map_2023-05-03_10-01-46.csv')
-
-
         # ! exploration
         if self.explore is True:
             # explore map to create a cartography
@@ -106,29 +96,6 @@ class MyRobotSlam(RobotAbstract):
 
                     else:
                         command = {"forward": 0, "rotation": 0}
-
-
-            # * save map
-            elif self.counter == self.explore_counter_limit:
-                if self.save_map is True:
-                    # save occupancy map
-                    occupancy_map = self.tiny_slam.occupancy_map
-
-                    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                    save_path = './tp_rob201/maps/'
-
-                    np.savetxt(f'{save_path}occupancy_map_{now}.csv', occupancy_map, delimiter=',')
-
-
-        # ! planinning
-        # from the actual position plan the best way to the start position
-        if self.path is None and self.counter > self.explore_counter_limit:
-            goal = self.corrected_pose[:2].tolist()
-            start = self.odometer_values()[:2].tolist()
-
-            self.path = self.tiny_slam.plan(start, goal)
-            self.path_return = self.path
-
 
         # ! return
         # until arrive at the goal
@@ -163,8 +130,6 @@ class MyRobotSlam(RobotAbstract):
         # print(f'{self.counter}')
 
         return command
-
-
 
 
     def control_tp1(self):

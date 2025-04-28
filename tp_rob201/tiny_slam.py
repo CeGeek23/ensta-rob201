@@ -126,18 +126,6 @@ class TinySlam:
 
         self.occupancy_map[x_px, y_px] += val
 
-    def _score(self, lidar, pose):
-        """
-        Computes the sum of log probabilities of laser end points in the map
-        lidar : placebot object with lidar data
-        pose : [x, y, theta] nparray, position of the robot to evaluate, in world coordinates
-        """
-        # TODO for TP4
-
-        score = 0
-
-        return score
-
     def get_corrected_pose(self, odom_pose, odom_pose_ref=None):
         """
         Compute corrected pose in map frame from raw odom pose + odom frame pose,
@@ -147,9 +135,63 @@ class TinySlam:
                         use self.odom_pose_ref if not given
         """
         # TODO for TP4
+        
+        d0 = np.sqrt(odom_pose[0]**2 + odom_pose[1]**2)
+        alpha0 = np.arctan2(odom_pose[1], odom_pose[0])
+        
+        if odom_pose_ref.any() == None :
+            odom_pose = self.odom_pose_ref
+        else :
+            odom_pose[0] = odom_pose_ref[0] + d0 * np.cos(odom_pose_ref[2]+ alpha0)
+            odom_pose[1] = odom_pose_ref[1] + d0 * np.sin(odom_pose_ref[2]+ alpha0)
+            odom_pose[2] = odom_pose[2] + odom_pose_ref[2]   
+            
         corrected_pose = odom_pose
-
+        
         return corrected_pose
+
+    def _score(self, lidar, pose):
+        """
+        Computes the sum of log probabilities of laser end points in the map
+        lidar : placebot object with lidar data
+        pose : [x, y, theta] nparray, position of the robot to evaluate, in world coordinates
+        """
+        # TODO for TP4
+        distances = lidar.get_sensor_values() # retourne les distances du lidar
+        angles = lidar.get_ray_angles() # angles fournis par le capteur lidar
+        
+        # array de booleens représentant les obstacles trouvées par le lidar
+        is_obstacle = distances < lidar.max_range
+        
+        # Récupérons la position du robot
+        x_0 = pose[0]
+        y_0 = pose[1]
+        angle_0 = pose[2]
+        
+        # récupérons les valeurs du lidar avec les obstacles dans le referentiel de l'odométrie
+        xObs = x_0 + distances[is_obstacle] * np.cos(angles[is_obstacle] + angle_0)
+        yObs = y_0 + distances[is_obstacle] * np.sin(angles[is_obstacle] + angle_0)
+        
+        # convertissons les coordonnées du lidar dans le referentiel de la map
+        xObsMap, yObsMap = self._conv_world_to_map(xObs, yObs)
+        
+        # gardons seulement les valeurs dans la map
+        isValidX = xObsMap < self.x_max_map
+        isValidY = yObsMap < self.y_max_map
+        
+        xObsMap = xObsMap[isValidX * isValidY]
+        yObsMap = yObsMap[isValidX * isValidY]
+        
+        isValidX = 0 <= xObsMap
+        isValidY = 0 <= yObsMap
+        
+        xObsMap = xObsMap[isValidX * isValidY]
+        yObsMap = yObsMap[isValidX * isValidY]
+        
+        # somme des valeurs d'occupation des points d'obstacles
+        score = np.sum(self.occupancy_map[xObsMap, yObsMap])
+        print("score:", score)
+        return score
 
     def localise(self, lidar, raw_odom_pose):
         """
@@ -159,9 +201,44 @@ class TinySlam:
         """
         # TODO for TP4
 
-        best_score = 0
-
+        # on initialise le score avec la position de référence
+        best_score = self._score(lidar, raw_odom_pose)
+        best_ref = self.odom_pose_ref
+        
+        # paramètres de la recherche (variations aléatoires)
+        i = 0
+        N = 100
+        
+        # valeur aléatoire suivant une distribution gaussienne
+        while i < N:
+            # offset aléatoire
+            offset = []
+            sigma = np.array([6.0, 6.0, 0.01]) # ecart-types de la distribution gaussienne multidimensionnelle
+            
+            offset.append(np.random.normal(0.0, sigma[0]))
+            offset.append(np.random.normal(0.0, sigma[1]))
+            offset.append(np.random.normal(0.0, sigma[2]))
+            
+            # on ajoute l'offset à la position de référence de l'odométrie
+            new_ref = best_ref + offset
+            
+            # ajout de l'offset à la référence
+            odom_offset = self.get_corrected_pose(raw_odom_pose, new_ref)
+            offset_score = self._score(lidar, odom_offset)
+            
+            # si un nouveau score est trouvé, on réinitialise le nombre d'essais
+            if offset_score >= best_score:
+                i = 0
+                best_score = offset_score
+                best_ref = new_ref
+            # on continue la recherche
+            else:
+                i += 1
+        # on sauvegarde la meilleure référence trouvée
+        self.odom_pose_ref = best_ref
+        
         return best_score
+
 
     def update_map(self, lidar, pose):
         """
@@ -177,8 +254,8 @@ class TinySlam:
         # define threshold for border values
         border = 20
 
-        # get array of bool's where the lidar found obstacules
-        isObstacule = distances <= (lidar.max_range - border)
+        # get array of bool's where the lidar found _obstacles
+        is_obstacle = distances <= (lidar.max_range - border)
 
         # get robot's position, odometer referencial (robot's initial position)
         x_0 = pose[0]
@@ -189,8 +266,8 @@ class TinySlam:
         x = distances * np.cos(angles + angle_0) + x_0
         y = distances * np.sin(angles + angle_0) + y_0
 
-        # increase points values, obstacule
-        self.add_map_points(x[isObstacule], y[isObstacule], +0.35)  # modèle simple
+        # increase points values, _obstacle
+        self.add_map_points(x[is_obstacle], y[is_obstacle], +0.35)  # modèle simple
 
         # decrease points values, free path
         for x, y in zip(x, y):
@@ -243,132 +320,132 @@ class TinySlam:
         return None
 
 
-    def get_neighbors(self, current):
-        """
-        get the 8 neighbors of a point in the map
-        current : point in the map
-        """
+    # def get_neighbors(self, current):
+    #     """
+    #     get the 8 neighbors of a point in the map
+    #     current : point in the map
+    #     """
 
-        x, y = current
-        neighbors = []
+    #     x, y = current
+    #     neighbors = []
 
-        for i in [-1, 0, +1]:
-            for j in [-1, 0, +1]:
-                # if node is not current
-                if not(i == 0 and j == 0):
+    #     for i in [-1, 0, +1]:
+    #         for j in [-1, 0, +1]:
+    #             # if node is not current
+    #             if not(i == 0 and j == 0):
 
-                    new_x, new_y = x+i, y+j
-                    # if node is inside map
-                    if (new_x >= 0 and new_x <= self.x_max_map and
-                        new_y >= 0 and new_y <= self.y_max_map):
+    #                 new_x, new_y = x+i, y+j
+    #                 # if node is inside map
+    #                 if (new_x >= 0 and new_x <= self.x_max_map and
+    #                     new_y >= 0 and new_y <= self.y_max_map):
 
-                        neighbors.append((new_x, new_y))
+    #                     neighbors.append((new_x, new_y))
 
-        return neighbors
-
-
-    def heuristic(self, a, b):
-        # unfolding coordinates
-        x_a, y_a = a
-        x_b, y_b = b
-
-        # euclidean distance
-        return np.sqrt( (x_b - x_a)**2 + (y_b - y_a)**2 )
+    #     return neighbors
 
 
-    def plan(self, start, goal):
-        """
-        Compute a path using A*, recompute plan if start or goal change
-        start : [x, y, theta] nparray, start pose in world coordinates
-        goal : [x, y, theta] nparray, goal pose in world coordinates
-        """
+    # def heuristic(self, a, b):
+    #     # unfolding coordinates
+    #     x_a, y_a = a
+    #     x_b, y_b = b
+
+    #     # euclidean distance
+    #     return np.sqrt( (x_b - x_a)**2 + (y_b - y_a)**2 )
 
 
-        # ! expand obstacules
-        # car is not pontual, a clearance distance from the wall is need
-        occupancy_map_expanded = self.occupancy_map.copy()
-
-        # define minimal wall clearance in map dimensions
-        wall_clearance = 8
-        # wall_clearance = 17
-
-        # check every point in the map
-        for x in range(self.x_max_map):
-            for y in range(self.y_max_map):
-                # if this point is not unknown and is not free
-                if (self.occupancy_map[x][y] != OCCUPANCY_MIN and
-                    self.occupancy_map[x][y] != 0):
-
-                    for i in range(wall_clearance):
-                        for j in range(wall_clearance):
-                            # check if points are inside map
-                            if (x+i < self.x_max_map and x-i >= 0 and 
-                                y+j < self.y_max_map and y-j >= 0):
-                                # expand all four graph quadrants
-                                occupancy_map_expanded[x+i][y+j] = OCCUPANCY_MAX
-                                occupancy_map_expanded[x+i][y-j] = OCCUPANCY_MAX
-                                occupancy_map_expanded[x-i][y-j] = OCCUPANCY_MAX
-                                occupancy_map_expanded[x-i][y+j] = OCCUPANCY_MAX
+    # def plan(self, start, goal):
+    #     """
+    #     Compute a path using A*, recompute plan if start or goal change
+    #     start : [x, y, theta] nparray, start pose in world coordinates
+    #     goal : [x, y, theta] nparray, goal pose in world coordinates
+    #     """
 
 
-        # ! A* algorithm
-        # convert from world to map coordinates
-        start = self._conv_world_to_map(start[0], start[1])
-        goal  = self._conv_world_to_map(goal[0], goal[1])
+    #     # ! expand _obstacles
+    #     # car is not pontual, a clearance distance from the wall is need
+    #     occupancy_map_expanded = self.occupancy_map.copy()
 
-        # heapq initialization
-        priority_heap = []
-        heapq.heappush(priority_heap, (0, start))
+    #     # define minimal wall clearance in map dimensions
+    #     wall_clearance = 8
+    #     # wall_clearance = 17
 
-        # dictionary to retrace the path
-        parent_nodes = {}
+    #     # check every point in the map
+    #     for x in range(self.x_max_map):
+    #         for y in range(self.y_max_map):
+    #             # if this point is not unknown and is not free
+    #             if (self.occupancy_map[x][y] != OCCUPANCY_MIN and
+    #                 self.occupancy_map[x][y] != 0):
 
-        # scores dictionaries
-        g_scores = defaultdict(lambda: math.inf)
-        g_scores[start] = 0
-        f_scores = defaultdict(lambda: math.inf)
-        f_scores[start] = self.heuristic(start, goal)
-
-        # loop util heap is empty, meaning: no path found or goal found
-        while priority_heap:
-            # pop node with smallest f value
-            _, current_node = heapq.heappop(priority_heap)
-
-            # * path reconstruction, goal was found
-            if current_node == goal:
-                path = [current_node]
-
-                while current_node in parent_nodes.keys():
-                    current_node = parent_nodes[current_node]
-                    path.insert(0, current_node)
-
-                # return reverse path
-                return path[::-1]
-                # return path
+    #                 for i in range(wall_clearance):
+    #                     for j in range(wall_clearance):
+    #                         # check if points are inside map
+    #                         if (x+i < self.x_max_map and x-i >= 0 and 
+    #                             y+j < self.y_max_map and y-j >= 0):
+    #                             # expand all four graph quadrants
+    #                             occupancy_map_expanded[x+i][y+j] = OCCUPANCY_MAX
+    #                             occupancy_map_expanded[x+i][y-j] = OCCUPANCY_MAX
+    #                             occupancy_map_expanded[x-i][y-j] = OCCUPANCY_MAX
+    #                             occupancy_map_expanded[x-i][y+j] = OCCUPANCY_MAX
 
 
-            neighbors = self.get_neighbors(current_node)
+    #     # ! A* algorithm
+    #     # convert from world to map coordinates
+    #     start = self._conv_world_to_map(start[0], start[1])
+    #     goal  = self._conv_world_to_map(goal[0], goal[1])
 
-            # loop through possible movements
-            for neighbor in neighbors:
+    #     # heapq initialization
+    #     priority_heap = []
+    #     heapq.heappush(priority_heap, (0, start))
 
-                # check neighbor is not an obstacule
-                isAvaliable = occupancy_map_expanded[neighbor[0]][neighbor[1]] == OCCUPANCY_MIN
+    #     # dictionary to retrace the path
+    #     parent_nodes = {}
 
-                if isAvaliable:
-                    # compute neighbor's g value
-                    tentative_g_score = g_scores[current_node] + self.heuristic(current_node, neighbor)
+    #     # scores dictionaries
+    #     g_scores = defaultdict(lambda: math.inf)
+    #     g_scores[start] = 0
+    #     f_scores = defaultdict(lambda: math.inf)
+    #     f_scores[start] = self.heuristic(start, goal)
 
-                    if tentative_g_score < g_scores[neighbor]:
-                        parent_nodes[neighbor] = current_node
-                        g_scores[neighbor] = tentative_g_score
-                        f_scores[neighbor] = tentative_g_score + self.heuristic(neighbor, goal)
+    #     # loop util heap is empty, meaning: no path found or goal found
+    #     while priority_heap:
+    #         # pop node with smallest f value
+    #         _, current_node = heapq.heappop(priority_heap)
 
-                        if neighbor not in priority_heap:
-                            heapq.heappush(priority_heap, (f_scores[neighbor], neighbor))
+    #         # * path reconstruction, goal was found
+    #         if current_node == goal:
+    #             path = [current_node]
 
-        # if heap is empty and no path was found
-        return None
+    #             while current_node in parent_nodes.keys():
+    #                 current_node = parent_nodes[current_node]
+    #                 path.insert(0, current_node)
+
+    #             # return reverse path
+    #             return path[::-1]
+    #             # return path
+
+
+    #         neighbors = self.get_neighbors(current_node)
+
+    #         # loop through possible movements
+    #         for neighbor in neighbors:
+
+    #             # check neighbor is not an _obstacle
+    #             isAvaliable = occupancy_map_expanded[neighbor[0]][neighbor[1]] == OCCUPANCY_MIN
+
+    #             if isAvaliable:
+    #                 # compute neighbor's g value
+    #                 tentative_g_score = g_scores[current_node] + self.heuristic(current_node, neighbor)
+
+    #                 if tentative_g_score < g_scores[neighbor]:
+    #                     parent_nodes[neighbor] = current_node
+    #                     g_scores[neighbor] = tentative_g_score
+    #                     f_scores[neighbor] = tentative_g_score + self.heuristic(neighbor, goal)
+
+    #                     if neighbor not in priority_heap:
+    #                         heapq.heappush(priority_heap, (f_scores[neighbor], neighbor))
+
+    #     # if heap is empty and no path was found
+    #     return None
 
 
     def display(self, robot_pose):
