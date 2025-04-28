@@ -126,7 +126,7 @@ class TinySlam:
 
         self.occupancy_map[x_px, y_px] += val
 
-    def get_corrected_pose(self, odom_pose, odom_pose_ref=None):
+    def get_corrected_pose(self, odom, odom_pose_ref=None):
         """
         Compute corrected pose in map frame from raw odom pose + odom frame pose,
         either given as second param or using the ref from the object
@@ -134,21 +134,42 @@ class TinySlam:
         odom_pose_ref : optional, origin of the odom frame if given,
                         use self.odom_pose_ref if not given
         """
-        # TODO for TP4
-        
-        d0 = np.sqrt(odom_pose[0]**2 + odom_pose[1]**2)
-        alpha0 = np.arctan2(odom_pose[1], odom_pose[0])
-        
-        if odom_pose_ref.any() == None :
-            odom_pose = self.odom_pose_ref
-        else :
-            odom_pose[0] = odom_pose_ref[0] + d0 * np.cos(odom_pose_ref[2]+ alpha0)
-            odom_pose[1] = odom_pose_ref[1] + d0 * np.sin(odom_pose_ref[2]+ alpha0)
-            odom_pose[2] = odom_pose[2] + odom_pose_ref[2]   
-            
-        corrected_pose = odom_pose
-        
+        # TP4
+
+        # initialize reference with not given
+        if odom_pose_ref is None:
+            odom_pose_ref = self.odom_pose_ref
+
+        # odometer original reference
+        x_odom_ref = odom_pose_ref[0]
+        y_odom_ref = odom_pose_ref[1]
+        ang_odom_ref = odom_pose_ref[2]
+
+        # robot position in his odometer reference
+        x_odom = odom[0]
+        y_odom = odom[1]
+        ang_odom = odom[2]
+
+        # distance travelled by the robot
+        distance = np.sqrt(x_odom**2 + y_odom**2)
+
+        # angle turned by the robot in relation of the odometer origin
+        ang_rotation = np.arctan2(y_odom, x_odom)
+
+        # convert absolute map position
+        corrected_pose = []
+
+        x_corrected = x_odom_ref + distance * np.cos(ang_rotation + ang_odom_ref)
+        y_corrected = y_odom_ref + distance * np.sin(ang_rotation + ang_odom_ref)
+
+        corrected_pose.append(x_corrected)
+        corrected_pose.append(y_corrected)
+        corrected_pose.append(ang_odom + ang_odom_ref)
+        # as angles are measure in relation of it's last reference their sum
+        # will be in relation of the world reference
+
         return corrected_pose
+
 
     def _score(self, lidar, pose):
         """
@@ -207,13 +228,13 @@ class TinySlam:
         
         # paramètres de la recherche (variations aléatoires)
         i = 0
-        N = 100
+        N = 1.25e2
         
         # valeur aléatoire suivant une distribution gaussienne
         while i < N:
             # offset aléatoire
             offset = []
-            sigma = np.array([6.0, 6.0, 0.01]) # ecart-types de la distribution gaussienne multidimensionnelle
+            sigma = np.array([5.0, 5.0, 0.15]) # ecart-types de la distribution gaussienne multidimensionnelle
             
             offset.append(np.random.normal(0.0, sigma[0]))
             offset.append(np.random.normal(0.0, sigma[1]))
@@ -277,22 +298,6 @@ class TinySlam:
         self.occupancy_map[self.occupancy_map >= OCCUPANCY_MAX] = OCCUPANCY_MAX
         self.occupancy_map[self.occupancy_map <= OCCUPANCY_MIN] = OCCUPANCY_MIN
 
-
-    # A améliorer, car prends trop de temps
-    # def compute(self):
-    #     """ Useless function, just for the exercise on using the profiler """
-    #     # Remove after TP1
-
-    #     ranges = np.random.rand(3600)
-    #     ray_angles = np.arange(-np.pi, np.pi, np.pi / 1800)
-
-    #     # Poor implementation of polar to cartesian conversion
-    #     points = []
-    #     for i in range(3600):
-    #         pt_x = ranges[i] * np.cos(ray_angles[i])
-    #         pt_y = ranges[i] * np.sin(ray_angles[i])
-    #         points.append([pt_x, pt_y])
-    
     # Fonction compute améliorée, en se servant de numpy, typiquement il faut éviter les boucles for       
     def compute(self):
         """ Useless function, just for the exercise on using the profiler """
@@ -531,31 +536,112 @@ class TinySlam:
         cv2.imshow("map slam", img2)
         cv2.waitKey(1)
 
-
-    def save(self, filename):
+    def display_plt(self, robot_pose, goal=None, traj=None):
         """
-        Save map as image and pickle object
-        filename : base name (without extension) of file on disk
+        Display the map and robot pose using matplotlib.
+        robot_pose : [x, y, theta] nparray, corrected robot pose
+        goal : [x, y] nparray, optional, goal position in world coordinates
+        traj : list of [x, y] nparray, optional, trajectory points in world coordinates
         """
-
+        plt.cla()
         plt.imshow(self.occupancy_map.T,
-                   origin='lower',
-                   extent=[
-                       self.x_min_world, self.x_max_world, self.y_min_world,
-                       self.y_max_world
-                   ])
+                origin='lower',
+                extent=[
+                    self.x_min_world, self.x_max_world, self.y_min_world,
+                    self.y_max_world
+                ])
         plt.clim(-4, 4)
         plt.axis("equal")
-        plt.savefig(filename + '.png')
 
-        with open(filename + ".p", "wb") as fid:
-            pickle.dump(
-                {
-                    'occupancy_map': self.occupancy_map,
-                    'resolution': self.resolution,
-                    'x_min_world': self.x_min_world,
-                    'x_max_world': self.x_max_world,
-                    'y_min_world': self.y_min_world,
-                    'y_max_world': self.y_max_world
-                }, fid)
+        # Draw robot pose
+        delta_x = np.cos(robot_pose[2]) * 10
+        delta_y = np.sin(robot_pose[2]) * 10
+        plt.arrow(
+            robot_pose[0],
+            robot_pose[1],
+            delta_x,
+            delta_y,
+            color='red',
+            head_width=5,
+            head_length=10,
+        )
+
+        # Draw goal if provided
+        if goal is not None:
+            plt.scatter(goal[0], goal[1], color='green', label='Goal')
+
+        # Draw trajectory if provided
+        if traj is not None:
+            traj = np.array(traj)
+            plt.plot(traj[:, 0], traj[:, 1], color='blue', label='Trajectory')
+
+        plt.legend()
+        plt.pause(0.001)
+
+    def display_cv(self, robot_pose, goal=None, traj=None):
+        """
+        Display the map and robot pose using OpenCV.
+        robot_pose : [x, y, theta] nparray, corrected robot pose
+        goal : [x, y] nparray, optional, goal position in world coordinates
+        traj : list of [x, y] nparray, optional, trajectory points in world coordinates
+        """
+        img = cv2.flip(self.occupancy_map.T, 0)
+        img = img - img.min()
+        img = img / img.max() * 255
+        img = np.uint8(img)
+        img2 = cv2.applyColorMap(src=img, colormap=cv2.COLORMAP_JET)
+
+        # Draw robot pose
+        pt2_x = robot_pose[0] + np.cos(robot_pose[2]) * 20
+        pt2_y = robot_pose[1] + np.sin(robot_pose[2]) * 20
+        pt2_x, pt2_y = self._conv_world_to_map(pt2_x, -pt2_y)
+        pt1_x, pt1_y = self._conv_world_to_map(robot_pose[0], -robot_pose[1])
+        pt1 = (int(pt1_x), int(pt1_y))
+        pt2 = (int(pt2_x), int(pt2_y))
+        cv2.arrowedLine(img=img2, pt1=pt1, pt2=pt2, color=(0, 0, 255), thickness=2)
+
+        # Draw goal if provided
+        if goal is not None:
+            goal_x, goal_y = self._conv_world_to_map(goal[0], -goal[1])
+            cv2.circle(img2, (int(goal_x), int(goal_y)), radius=5, color=(0, 255, 0), thickness=-1)
+
+        # Draw trajectory if provided
+        if traj is not None:
+            color = (255, 255, 255)
+            traj_corrected = []
+            for x, y in traj:
+                x_corr, y_corr = self._conv_world_to_map(x, -y)
+                traj_corrected.append((int(x_corr), int(y_corr)))
+            for i in range(len(traj_corrected) - 1):
+                cv2.line(img2, traj_corrected[i], traj_corrected[i + 1], color, 1)
+
+        cv2.imshow("map slam", img2)
+        cv2.waitKey(1)
+
+        def save(self, filename):
+            """
+            Save map as image and pickle object
+            filename : base name (without extension) of file on disk
+            """
+
+            plt.imshow(self.occupancy_map.T,
+                    origin='lower',
+                    extent=[
+                        self.x_min_world, self.x_max_world, self.y_min_world,
+                        self.y_max_world
+                    ])
+            plt.clim(-4, 4)
+            plt.axis("equal")
+            plt.savefig(filename + '.png')
+
+            with open(filename + ".p", "wb") as fid:
+                pickle.dump(
+                    {
+                        'occupancy_map': self.occupancy_map,
+                        'resolution': self.resolution,
+                        'x_min_world': self.x_min_world,
+                        'x_max_world': self.x_max_world,
+                        'y_min_world': self.y_min_world,
+                        'y_max_world': self.y_max_world
+                    }, fid)
 

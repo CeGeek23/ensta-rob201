@@ -5,7 +5,7 @@ import numpy as np
 import math
 
 def reactiveFront(lidar, minClearance: float):
-    distances = lidar.get_sensor_values()
+    distances = lidar.get_sensor_values()   # distance in cm
     frontIndex = 180
 
 
@@ -14,8 +14,11 @@ def reactiveFront(lidar, minClearance: float):
     else:
         return {"forward": +0.00, "rotation": random.uniform(-1, +1)}
 
+
 def distFOV(lidar, start: int, end: int):
     return np.mean(lidar.get_sensor_values()[start:end])
+
+
 
 def reactiveRange(lidar, minClearance: float):
     frontIndex = 180
@@ -28,6 +31,7 @@ def reactiveRange(lidar, minClearance: float):
         return {"forward": +0.25, "rotation": 0.00}
     else:
         return {"forward": +0.00, "rotation": random.uniform(-1, +1)}
+
 
 
 def wall_follow(lidar):
@@ -107,12 +111,14 @@ def wall_follow(lidar):
 
     return command
 
-def reactive_obst_avoid(lidar, odometer_values):
+
+
+def reactive_obst_avoid(lidar):
     """
     Simple obstacle avoidance
     lidar : placebot object with lidar data
     """
-    # TODO for TP1
+    # * TP1 Code
 
     minClearance = 50.0
     # return reactiveFront(lidar, minClearance)
@@ -147,7 +153,7 @@ def potential_field_control(lidar, pose, goal):
     distances = lidar.get_sensor_values()   # 
     angles = lidar.get_ray_angles()         # angles in radiums
 
-    # get array of bool's where the lidar found obstacles inside safe zone
+    # get array of bool's where the lidar found obstacules inside safe zone
     isDangerous = distances < DST_SAFE
 
     # create array of dangerous values
@@ -155,7 +161,7 @@ def potential_field_control(lidar, pose, goal):
     danger_angles    = angles[isDangerous]
 
     potential_repulsive = [0, 0]
-    # checking for obstacles
+    # checking for obstacules
     if len(danger_distances) != 0:
         # found, get the closest one
         min_index = np.argmin(danger_distances)
@@ -167,12 +173,12 @@ def potential_field_control(lidar, pose, goal):
         y_0 = pose[1]
         angle_0 = pose[2]
 
-        obstacle = []
-        obstacle.append(min_distance * np.cos(min_angle + angle_0) + x_0)
-        obstacle.append(min_distance * np.sin(min_angle + angle_0) + y_0)
+        obstacule = []
+        obstacule.append(min_distance * np.cos(min_angle + angle_0) + x_0)
+        obstacule.append(min_distance * np.sin(min_angle + angle_0) + y_0)
 
         repulsive_const = 0.9e6
-        repulsive_diff = obstacle[:2] - pose[:2]
+        repulsive_diff = obstacule[:2] - pose[:2]
         repulsive_dist = np.sqrt(repulsive_diff[0]**2 + repulsive_diff[1]**2)
 
         if atr_distance > DST_MIN:
@@ -198,6 +204,7 @@ def potential_field_control(lidar, pose, goal):
         command = {"forward": forward, "rotation": rotation}
 
     return command
+
 
 
 def potential_attraction(position, goal):
