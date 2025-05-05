@@ -14,10 +14,8 @@ def reactiveFront(lidar, minClearance: float):
     else:
         return {"forward": +0.00, "rotation": random.uniform(-1, +1)}
 
-
 def distFOV(lidar, start: int, end: int):
     return np.mean(lidar.get_sensor_values()[start:end])
-
 
 def reactiveRange(lidar, minClearance: float):
     frontIndex = 180

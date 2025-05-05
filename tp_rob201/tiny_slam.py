@@ -51,9 +51,6 @@ class TinySlam:
         isValidX = xObsMap < self.grid.x_max_map
         isValidY = yObsMap < self.grid.y_max_map
         
-        xObsMap = xObsMap[isValidX * isValidY]
-        yObsMap = yObsMap[isValidX * isValidY]
-        
         isValidX = 0 <= xObsMap
         isValidY = 0 <= yObsMap
         
@@ -63,7 +60,41 @@ class TinySlam:
         # somme des valeurs d'occupation des points d'obstacles
         score = np.sum(self.grid.occupancy_map[xObsMap, yObsMap])
         return score
-
+    
+    # def _score_interpolation(self, lidar, pose):
+    #     distances = lidar.get_sensor_values()
+    #     angles = lidar.get_ray_angles()
+        
+    #     is_obstacle = distances < lidar.max_range
+        
+    #     # Récupérons la position du robot
+    #     x_0 = pose[0]
+    #     y_0 = pose[1]
+    #     angle_0 = pose[2]
+        
+    #     # récupérons les valeurs du lidar avec les obstacles dans le referentiel de l'odométrie
+    #     xObs = x_0 + distances[is_obstacle] * np.cos(angles[is_obstacle] + angle_0)
+    #     yObs = y_0 + distances[is_obstacle] * np.sin(angles[is_obstacle] + angle_0)
+        
+    #     # convertissons les coordonnées du lidar dans le referentiel de la map
+    #     xObsMap, yObsMap = self.grid.conv_world_to_map(xObs, yObs)
+        
+    #     # gardons seulement les valeurs dans la map
+    #     isValidX = xObsMap < self.grid.x_max_map
+    #     isValidY = yObsMap < self.grid.y_max_map
+        
+    #     xObsMap = xObsMap[isValidX * isValidY]
+    #     yObsMap = yObsMap[isValidX * isValidY]
+        
+    #     isValidX = 0 <= xObsMap
+    #     isValidY = 0 <= yObsMap
+        
+    #     xObsMap = xObsMap[isValidX * isValidY]
+    #     yObsMap = yObsMap[isValidX * isValidY]
+        
+    #     score = yObsMap - 
+        
+        
     def get_corrected_pose(self, odom, odom_pose_ref=None):
         """
         Compute corrected pose in map frame from raw odom pose + odom frame pose,
@@ -176,7 +207,7 @@ class TinySlam:
         y = distances * np.sin(angles + angle_0) + y_0
 
         # increase points values, _obstacle
-        self.grid.add_map_points(x[is_obstacle], y[is_obstacle], +0.35)  # modèle simple
+        self.grid.add_map_points(x[is_obstacle], y[is_obstacle], +0.35)
 
         # decrease points values, free path
         for x_i, y_i in zip(x, y):

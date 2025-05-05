@@ -46,10 +46,10 @@ class MyRobotSlam(RobotAbstract):
         # storage for pose after localization
         self.corrected_pose = np.array([0, 0, 0])
 
-        self.command_choice = 'potential_attraction'
-        self.save_map = False
+        self.command_choice = 'potential_field'
+        self.save_map = True
         self.explore = True
-        self.explore_counter_limit = 3000
+        self.explore_counter_limit = 10000
 
         self.path = None
         self.path_return = None
@@ -129,7 +129,7 @@ class MyRobotSlam(RobotAbstract):
 
         # ! increase counter
         self.counter += 1
-        print("self.counter:", f'{self.counter}')
+        # print("counter:", f'{self.counter}')
 
         return command
 
