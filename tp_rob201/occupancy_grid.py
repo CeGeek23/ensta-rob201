@@ -16,10 +16,7 @@ class OccupancyGrid:
     """Simple occupancy grid"""
 
     def __init__(self, x_min, x_max, y_min, y_max, resolution):
-        """
-        # constructeur qui initialise la grille d'occupation et 
-        # définit les bornes et la résolution de la carte
-        """
+        # Given : constructor
         self.x_min_world = x_min
         self.x_max_world = x_max
         self.y_min_world = y_min

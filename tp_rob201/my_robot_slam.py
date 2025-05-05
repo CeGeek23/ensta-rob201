@@ -123,7 +123,7 @@ class MyRobotSlam(RobotAbstract):
         # ! update
         # display occupancy map within a certain frequency
         if self.counter % 1 == 0:
-            self.tiny_slam.display2(self.odometer_values(), self.path)
+            self.tiny_slam.grid.display_cv(self.odometer_values(), self.path)
 
         # ! increase counter
         self.counter += 1
