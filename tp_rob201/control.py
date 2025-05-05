@@ -19,7 +19,6 @@ def distFOV(lidar, start: int, end: int):
     return np.mean(lidar.get_sensor_values()[start:end])
 
 
-
 def reactiveRange(lidar, minClearance: float):
     frontIndex = 180
     rangeSize = 60
@@ -31,7 +30,6 @@ def reactiveRange(lidar, minClearance: float):
         return {"forward": +0.25, "rotation": 0.00}
     else:
         return {"forward": +0.00, "rotation": random.uniform(-1, +1)}
-
 
 
 def wall_follow(lidar):
@@ -110,7 +108,6 @@ def wall_follow(lidar):
     command = {"forward": forward_limited, "rotation": rotation_limited}
 
     return command
-
 
 
 def reactive_obst_avoid(lidar):
@@ -204,7 +201,6 @@ def potential_field_control(lidar, pose, goal):
         command = {"forward": forward, "rotation": rotation}
 
     return command
-
 
 
 def potential_attraction(position, goal):

@@ -12,3 +12,11 @@ raysangle = [-pi, ......, pi]
 
 lidar.max_range() : les valeurs maximales
 
+
+Le repère absolu c'est le world*
+world = repère absolu = repère monde 
+odom_ref = repère relatif = position du repère de l'odometrie par rapport au robot
+
+
+
+

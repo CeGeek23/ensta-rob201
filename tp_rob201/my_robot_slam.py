@@ -131,7 +131,6 @@ class MyRobotSlam(RobotAbstract):
 
         return command
 
-
     def control_tp1(self):
         """
         Control function for TP1
