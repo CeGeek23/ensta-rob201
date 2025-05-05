@@ -46,10 +46,10 @@ class MyRobotSlam(RobotAbstract):
         # storage for pose after localization
         self.corrected_pose = np.array([0, 0, 0])
 
-        self.command_choice = 'wall_follow'
+        self.command_choice = 'potential_attraction'
         self.save_map = False
         self.explore = True
-        self.explore_counter_limit = 1000
+        self.explore_counter_limit = 3000
 
         self.path = None
         self.path_return = None
@@ -94,6 +94,9 @@ class MyRobotSlam(RobotAbstract):
                     elif self.command_choice == 'wall_follow':
                         command = wall_follow(self.lidar())
 
+                    elif self.command_choice == 'potential_attraction':
+                        command = potential_attraction(self.odometer_values(), np.array([-100.0, -400.0, 0]))
+
                     else:
                         command = {"forward": 0, "rotation": 0}
 
@@ -107,11 +110,10 @@ class MyRobotSlam(RobotAbstract):
 
             # get next goal
             x_map, y_map = self.path_return[0]
-            x_goal, y_goal = self.tiny_slam._conv_map_to_world(x_map, y_map)
+            x_goal, y_goal = self.tiny_slam.grid.conv_map_to_world(x_map, y_map)
             goal = (x_goal, y_goal)
 
             distance_goal = np.sqrt((x_pos - x_goal)**2 + (y_pos - y_goal)**2)
-
 
             # if is already close enough, remove closest nodes
             if distance_goal < 15:
@@ -127,7 +129,7 @@ class MyRobotSlam(RobotAbstract):
 
         # ! increase counter
         self.counter += 1
-        # print(f'{self.counter}')
+        print("self.counter:", f'{self.counter}')
 
         return command
 
@@ -139,7 +141,7 @@ class MyRobotSlam(RobotAbstract):
         #self.tiny_slam.compute()
 
         # Compute new command speed to perform obstacle avoidance
-        command = reactive_obst_avoid(self.lidar(), self.odometer_values())
+        command = reactive_obst_avoid(self.lidar())
         return command
 
     def control_tp2(self):

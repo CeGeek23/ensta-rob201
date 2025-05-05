@@ -88,26 +88,19 @@ class TinySlam:
         y_odom = odom[1]
         ang_odom = odom[2]
 
-        # distance travelled by the robot
-        distance = np.sqrt(x_odom**2 + y_odom**2)
-
-        # angle turned by the robot in relation of the odometer origin
-        ang_rotation = np.arctan2(y_odom, x_odom)
-
-        # convert absolute map position
-        corrected_pose = []
-
-        x_corrected = x_odom_ref + distance * np.cos(ang_rotation + ang_odom_ref)
-        y_corrected = y_odom_ref + distance * np.sin(ang_rotation + ang_odom_ref)
-
-        corrected_pose.append(x_corrected)
-        corrected_pose.append(y_corrected)
-        corrected_pose.append(ang_odom + ang_odom_ref)
-        # as angles are measure in relation of it's last reference their sum
-        # will be in relation of the world reference
-
-        return corrected_pose
-
+        # Calcul plus direct des coordonnées corrigées
+        cos_ref = np.cos(ang_odom_ref)
+        sin_ref = np.sin(ang_odom_ref)
+        
+        # Rotation et translation pour obtenir les coordonnées dans le référentiel global
+        x_corrected = x_odom_ref + x_odom * cos_ref - y_odom * sin_ref
+        y_corrected = y_odom_ref + x_odom * sin_ref + y_odom * cos_ref
+        ang_corrected = ang_odom + ang_odom_ref
+        
+        # Normaliser l'angle entre -pi et pi
+        ang_corrected = np.arctan2(np.sin(ang_corrected), np.cos(ang_corrected))
+        
+        return [x_corrected, y_corrected, ang_corrected]
 
     def localise(self, lidar, raw_odom_pose):
         """
